@@ -1,0 +1,6 @@
+[server]
+hostname = 10.50.0.35
+port = 7500
+
+[format]
+weather-format = " %temperature-fahrenheit%°F   %humidity%%   %windcardinal% @ %windspeed% MPH   %rainfall%"
