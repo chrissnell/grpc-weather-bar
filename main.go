@@ -8,9 +8,10 @@ import (
 	"path/filepath"
 	"regexp"
 
-	weather "github.com/chrissnell/live-weather-bar/grpcweather"
+	weather "github.com/chrissnell/weather-bar/protobuf"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 func main() {
@@ -41,9 +42,20 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	conn, err := grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithInsecure())
-	if err != nil {
-		log.Fatalln("Failed to connect:", err)
+	var conn *grpc.ClientConn
+
+	if cfg.Server.Cert != "" {
+		creds, err := credentials.NewClientTLSFromFile(cfg.Server.Cert, "")
+		if err != nil {
+			log.Fatalln("Could not load TLS certificate:", err)
+		}
+
+		conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithTransportCredentials(creds))
+	} else {
+		conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithInsecure())
+		if err != nil {
+			log.Fatalln("Failed to connect:", err)
+		}
 	}
 
 	defer conn.Close()

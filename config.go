@@ -16,6 +16,7 @@ type Config struct {
 type ServerConfig struct {
 	Hostname string `ini:"hostname"`
 	Port     string `ini:"port"`
+	Cert     string `ini:"cert"`
 }
 
 // FormatConfig holds our output formatting configuration
