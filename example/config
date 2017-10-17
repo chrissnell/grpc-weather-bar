@@ -1,6 +1,8 @@
 [server]
 hostname = 10.50.0.35
 port = 7500
+; If you aren't using TLS on your server, comment out the following line
+cert = /path/to/your/servers/tls.cert
 
 [format]
 weather-format = " %temperature-fahrenheit%°F   %humidity%%   %windcardinal% @ %windspeed% MPH   %rainfall%"
