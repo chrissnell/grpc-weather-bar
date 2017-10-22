@@ -137,7 +137,7 @@ func formatOutput(c *Config, rdg *weather.WeatherReading) string {
 	output = regWindD.ReplaceAllLiteralString(output, fmt.Sprintf("%v", rdg.WindDir))
 	output = regWindC.ReplaceAllLiteralString(output, cardDirection)
 
-	output = regRain.ReplaceAllLiteralString(output, fmt.Sprintf("%.1f", rdg.RainfallDay))
+	output = regRain.ReplaceAllLiteralString(output, fmt.Sprintf("%.2f", rdg.RainfallDay))
 
 	return output
 }
