@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"regexp"
+	"time"
 
 	weather "github.com/chrissnell/weather-bar/protobuf"
 	"golang.org/x/net/context"
@@ -15,8 +16,6 @@ import (
 )
 
 func main() {
-	var rdg *weather.WeatherReading
-
 	uid, err := user.Current()
 	if err != nil {
 		log.Fatalln(err)
@@ -39,28 +38,53 @@ func main() {
 		cfg.Server.Port = "7500"
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	var conn *grpc.ClientConn
 
-	if cfg.Server.Cert != "" {
-		creds, err := credentials.NewClientTLSFromFile(cfg.Server.Cert, "")
-		if err != nil {
-			log.Fatalln("Could not load TLS certificate:", err)
+	errCh := make(chan error)
+
+	for {
+
+		if cfg.Server.Cert != "" {
+			creds, err := credentials.NewClientTLSFromFile(cfg.Server.Cert, "")
+			if err != nil {
+				log.Fatalln("Could not load TLS certificate:", err)
+			}
+
+			conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithTransportCredentials(creds), grpc.WithBlock())
+			if err != nil {
+				log.Println("Failed to connect:", err)
+			} else {
+				go getLiveWeather(cfg, conn, errCh)
+			}
+		} else {
+			conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithInsecure(), grpc.WithBlock())
+			if err != nil {
+				log.Println("Failed to connect:", err)
+			} else {
+				go getLiveWeather(cfg, conn, errCh)
+			}
 		}
 
-		conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithTransportCredentials(creds))
-	} else {
-		conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithInsecure())
+		err = <-errCh
 		if err != nil {
-			log.Fatalln("Failed to connect:", err)
+			fmt.Println("Connection to weather server failed.  Retrying in 1s.")
+			time.Sleep(time.Second)
 		}
+
 	}
+
+}
+
+func getLiveWeather(cfg *Config, conn *grpc.ClientConn, errCh chan error) {
+	var rdg *weather.WeatherReading
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	defer conn.Close()
 
 	c := weather.NewWeatherClient(conn)
+
 	lwc, err := c.GetLiveWeather(ctx, &weather.Empty{})
 	if err != nil {
 		log.Fatalln("Could not create GetLiveWeather client:", err)
@@ -70,7 +94,8 @@ func main() {
 		rdg, err = lwc.Recv()
 		if err != nil {
 			log.Println("Error receiving from server:", err)
-			break
+			errCh <- err
+			return
 		}
 
 		fmt.Println(formatOutput(cfg, rdg))
