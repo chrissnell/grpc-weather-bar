@@ -1,3 +1,5 @@
+![](http://island.nu/github/weather-bar/weather-bar.gif)
+
 # weather-bar
 Pull live weather reports from [gopherwx](https://github.com/chrissnell/gopherwx) and display them in Polybar.
 
