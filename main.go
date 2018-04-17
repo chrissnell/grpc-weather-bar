@@ -9,10 +9,11 @@ import (
 	"regexp"
 	"time"
 
-	weather "github.com/chrissnell/weather-bar/protobuf"
+	weather "github.com/chrissnell/grpc-weather-bar/protobuf"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 )
 
 func main() {
@@ -50,14 +51,20 @@ func main() {
 				log.Fatalln("Could not load TLS certificate:", err)
 			}
 
-			conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithTransportCredentials(creds), grpc.WithBlock())
+			conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithTransportCredentials(creds), grpc.WithBlock(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
+				Time:    time.Second,
+				Timeout: 5 * time.Second,
+			}))
 			if err != nil {
 				log.Println("Failed to connect:", err)
 			} else {
 				go getLiveWeather(cfg, conn, errCh)
 			}
 		} else {
-			conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithInsecure(), grpc.WithBlock())
+			conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
+				Time:    time.Second,
+				Timeout: 5 * time.Second,
+			}))
 			if err != nil {
 				log.Println("Failed to connect:", err)
 			} else {
