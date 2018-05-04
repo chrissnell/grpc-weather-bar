@@ -22,7 +22,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	cfgFile := flag.String("config", uid.HomeDir+"/.config/weather-bar/config", "Path to weather-bar config file (default: $HOME/.config/weather-bar/config)")
+	cfgFile := flag.String("config", uid.HomeDir+"/.config/grpc-weather-bar/config", "Path to weather-bar config file (default: $HOME/.config/grpc-weather-bar/config)")
 	flag.Parse()
 
 	// Read our server configuration
