@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -39,21 +40,28 @@ func main() {
 		cfg.Server.Port = "7500"
 	}
 
+	// Default timeout is 30s
+	if cfg.Server.Timeout == 0 {
+		cfg.Server.Timeout = 30 * time.Second
+	}
+
 	var conn *grpc.ClientConn
 
 	errCh := make(chan error)
 
 	for {
-
-		if cfg.Server.Cert != "" {
-			creds, err := credentials.NewClientTLSFromFile(cfg.Server.Cert, "")
+		// Use a client cert if we are doing mutual TLS authentication
+		if cfg.Server.MTLSCert != "" {
+			creds, err := credentials.NewClientTLSFromFile(cfg.Server.MTLSCert, "")
 			if err != nil {
 				log.Fatalln("Could not load TLS certificate:", err)
 			}
 
+			fmt.Printf("Dialing %v:%v ...\n", cfg.Server.Hostname, cfg.Server.Port)
+
 			conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithTransportCredentials(creds), grpc.WithBlock(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
 				Time:    time.Second,
-				Timeout: 5 * time.Second,
+				Timeout: cfg.Server.Timeout,
 			}))
 			if err != nil {
 				log.Println("Failed to connect:", err)
@@ -61,13 +69,37 @@ func main() {
 				go getLiveWeather(cfg, conn, errCh)
 			}
 		} else {
-			conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
-				Time:    time.Second,
-				Timeout: 5 * time.Second,
-			}))
+			fmt.Printf("Dialing %v:%v ...\n", cfg.Server.Hostname, cfg.Server.Port)
+
+			if !cfg.Server.UseTLS {
+				conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port,
+					grpc.WithInsecure(),
+					grpc.WithBlock(),
+					grpc.WithTimeout(cfg.Server.Timeout),
+					grpc.WithKeepaliveParams(
+						keepalive.ClientParameters{
+							Time:    15 * time.Second,
+							Timeout: cfg.Server.Timeout,
+						},
+					))
+			} else {
+				tlsConfig := tls.Config{}
+
+				conn, err = grpc.Dial(cfg.Server.Hostname+":"+cfg.Server.Port,
+					grpc.WithBlock(),
+					grpc.WithTransportCredentials(credentials.NewTLS(&tlsConfig)),
+					grpc.WithTimeout(cfg.Server.Timeout),
+					grpc.WithKeepaliveParams(
+						keepalive.ClientParameters{
+							Time:    15 * time.Second,
+							Timeout: cfg.Server.Timeout,
+						},
+					))
+			}
 			if err != nil {
 				log.Println("Failed to connect:", err)
 			} else {
+				fmt.Println("Getting live weather...")
 				go getLiveWeather(cfg, conn, errCh)
 			}
 		}
@@ -117,14 +149,14 @@ func formatOutput(c *Config, rdg *weather.WeatherReading) string {
 
 	output = c.Format.WxFormat
 
-	tempC := (rdg.OutsideTemp - 32) * (5 / 9)
+	tempC := (rdg.OutsideTemperature - 32) * (5.0 / 9.0)
 
 	cardDirections := []string{"  N", "NNE", " NE", "ENE",
 		"  E", "ESE", " SE", "SSE",
 		"  S", "SSW", " SW", "WSW",
 		"  W", "WNW", " NW", "NNW"}
 
-	cardIndex = int((float32(rdg.WindDir) + float32(11.25)) / float32(22.5))
+	cardIndex = int((float32(rdg.WindDirection) + float32(11.25)) / float32(22.5))
 	cardDirection := cardDirections[cardIndex%16]
 
 	regTempF := regexp.MustCompile("%temperature-fahrenheit%")
@@ -135,13 +167,13 @@ func formatOutput(c *Config, rdg *weather.WeatherReading) string {
 	regWindC := regexp.MustCompile("%windcardinal%")
 	regRain := regexp.MustCompile("%rainfall%")
 
-	output = regTempF.ReplaceAllLiteralString(output, fmt.Sprintf("%.1f", rdg.OutsideTemp))
+	output = regTempF.ReplaceAllLiteralString(output, fmt.Sprintf("%.1f", rdg.OutsideTemperature))
 	output = regTempC.ReplaceAllLiteralString(output, fmt.Sprintf("%.1f", tempC))
 
 	output = regHum.ReplaceAllLiteralString(output, fmt.Sprintf("%v", rdg.OutsideHumidity))
 
 	output = regWindS.ReplaceAllLiteralString(output, fmt.Sprintf("%v", rdg.WindSpeed))
-	output = regWindD.ReplaceAllLiteralString(output, fmt.Sprintf("%v", rdg.WindDir))
+	output = regWindD.ReplaceAllLiteralString(output, fmt.Sprintf("%v", rdg.WindDirection))
 	output = regWindC.ReplaceAllLiteralString(output, cardDirection)
 
 	output = regRain.ReplaceAllLiteralString(output, fmt.Sprintf("%.2f", rdg.RainfallDay))

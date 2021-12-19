@@ -2,6 +2,7 @@ package main
 
 import (
 	"io/ioutil"
+	"time"
 
 	"github.com/go-ini/ini"
 )
@@ -14,9 +15,11 @@ type Config struct {
 
 // ServerConfig holds configuration related to the remote gRPC server
 type ServerConfig struct {
-	Hostname string `ini:"hostname"`
-	Port     string `ini:"port"`
-	Cert     string `ini:"cert"`
+	Hostname string        `ini:"hostname"`
+	Port     string        `ini:"port"`
+	MTLSCert string        `ini:"mtls_cert"`
+	UseTLS   bool          `ini:"use_tls"`
+	Timeout  time.Duration `ini:"timeout"`
 }
 
 // FormatConfig holds our output formatting configuration
